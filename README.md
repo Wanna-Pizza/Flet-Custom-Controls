@@ -1,8 +1,3 @@
-# Flet Custom Controls
-
-This repository contains custom UI controls built with [Flet](https://flet.dev/) for Python.  
-Each control is implemented as a reusable component to simplify building modern, interactive desktop apps.
-
 ## Features
 
 - Easy-to-use custom controls (e.g., DropDown)
@@ -27,7 +22,3 @@ See the code comments and examples in each file for details.
   - `on_select` (callable): Callback function called when an option is selected (default: None)
   - `max_visible` (int): Maximum number of visible options in overlay (default: 3)
   - <img width="264" height="298" alt="image" src="https://github.com/user-attachments/assets/a7842d91-d3b5-4d09-823f-b356ca4f8545" />
-
-
-
-More controls will be added in the future.

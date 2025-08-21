@@ -1,12 +1,18 @@
 import asyncio
-import time
 import flet as ft
 
-
-BUTTON_HEIGHT = 30
-DEFAULT_BG = "white,0.03"
-DEFAULT_BORDER = ft.border.all(width=1, color='white,0.1')
+BUTTON_HEIGHT = 40
+DEFAULT_BORDER_DARKMODE = ft.border.all(width=1, color='white,0.1')
+DEFAULT_BORDER_LIGHTMODE = ft.border.all(width=0.5, color=ft.Colors.GREY_500)
+DEFAULT_TEXTCOLOR_DARKMODE = ft.Colors.WHITE60
+DEFAULT_TEXTCOLOR_LIGHTMODE = ft.Colors.BLACK87
+DEFAULT_TEXTSTYLE_DARKMODE = ft.TextStyle(size=15, color= DEFAULT_TEXTCOLOR_DARKMODE)
+DEFAULT_TEXTSTYLE_LIGHTMODE = ft.TextStyle(size=15, color= DEFAULT_TEXTCOLOR_LIGHTMODE)
+DEFAULT_BG = "white,0.01"
 DEFAULT_RADIUS = 10
+DEFAULT_BLUR = 10
+DEFAULT_ANIMATION_OPACITY = 300
+DEFAULT_ANIMATION_SPEED = 300
 
 
 class OverlayMenu(ft.Container):
@@ -15,13 +21,13 @@ class OverlayMenu(ft.Container):
     """
 
     def __init__(
-        self,
-        left: float = 0,
-        top: float = 0,
-        width: float = 200,
-        on_select: callable = None,
-        options=None,
-        max_visible: int = 3,
+            self,
+            left: float = 0,
+            top: float = 0,
+            width: float = 200,
+            on_select: callable = None,
+            options=None,
+            max_visible: int = 3,
     ):
         super().__init__()
         self._left = left
@@ -31,30 +37,40 @@ class OverlayMenu(ft.Container):
         self.max_visible = max_visible
         self.on_select = on_select
         self.height_button = BUTTON_HEIGHT
-        self.menu = None
         self.on_click = self.remove_menu
+        self.text_color = DEFAULT_TEXTCOLOR_DARKMODE
+        self.border = DEFAULT_BORDER_DARKMODE
+        self.menu:ft.Container = self._create_menu()
+        self.animate_opacity = DEFAULT_ANIMATION_OPACITY
+        self.animate = DEFAULT_ANIMATION_SPEED
 
     def _build_button(self, text):
+
         def on_hover(e):
-            color = 'white,0.1'
-            e.control.bgcolor = color if e.control.bgcolor != color else "white,0.00"
+            color = 'white,0.05'
+            if self.page:
+                if self.page.theme_mode == ft.ThemeMode.LIGHT:
+                    color = 'grey,0.15'
+                else:
+                    color = 'white,0.05'
+            e.control.bgcolor = color if e.control.bgcolor != color else 'white,0.00'
             e.control.update()
 
         return ft.Container(
-            content=ft.Text(text, size=16, color='white,0.8'),
+            content=ft.Text(text, size=16, color=self.text_color),
             on_click=lambda e: (self.on_select(text), self.remove_menu(e)),
-            height=self.height_button,
+            height=self.height_button - 8,
             on_hover=on_hover,
-            padding=ft.padding.only(left=10),
-            bgcolor='white,0.00',
-            alignment=ft.alignment.center_left
+            padding=ft.padding.only(left=5,right=5),
+            bgcolor= 'white,0.00',
+            alignment=ft.alignment.center
         )
 
     def _build_menu_content(self):
         return ft.Column(
             [self._build_button(option) for option in self.options],
-            scroll=ft.ScrollMode.AUTO,
-            spacing=0
+            scroll= ft.ScrollMode.AUTO if self.max_visible < self.options.__len__() else None,
+            spacing=0,
         )
 
     def _create_menu(self):
@@ -67,9 +83,9 @@ class OverlayMenu(ft.Container):
             blur=10,
             bgcolor=DEFAULT_BG,
             opacity=0,
-            animate_opacity=ft.Animation(duration=300, curve=ft.AnimationCurve.LINEAR_TO_EASE_OUT),
-            animate=ft.Animation(duration=300, curve=ft.AnimationCurve.LINEAR_TO_EASE_OUT),
-            border=DEFAULT_BORDER,
+            animate_opacity=ft.Animation(duration=self.animate_opacity, curve=ft.AnimationCurve.LINEAR_TO_EASE_OUT),
+            animate=ft.Animation(duration=self.animate, curve=ft.AnimationCurve.LINEAR_TO_EASE_OUT),
+            border=DEFAULT_BORDER_DARKMODE,
             content=self._build_menu_content()
         )
         return self.menu
@@ -81,9 +97,9 @@ class OverlayMenu(ft.Container):
         await asyncio.sleep(0.01)
         self.page.overlay.remove(self)
         self.page.update()
-    
-    def remove_menu(self,e):
-        self.page.run_task(self.async_remove_menu,e)
+
+    def remove_menu(self, e):
+        self.page.run_task(self.async_remove_menu, e)
 
     async def on_mount(self):
         self.page.update()
@@ -92,9 +108,19 @@ class OverlayMenu(ft.Container):
         self.page.update()
         await asyncio.sleep(0.02)
         count = len(self.options)
-        self.menu.height = self.height_button * min(count, self.max_visible)
+        self.menu.height = ((self.height_button - 8) * min(count, self.max_visible)) + 2
         self.menu.opacity = 1
         self.menu.update()
+
+    def before_update(self):
+        super().before_update()
+        if self.page.theme_mode == ft.ThemeMode.LIGHT:
+            self.text_color = DEFAULT_TEXTCOLOR_LIGHTMODE
+            self.menu.border = DEFAULT_BORDER_LIGHTMODE
+        else:
+            self.text_color = DEFAULT_TEXTCOLOR_DARKMODE
+            self.menu.border = DEFAULT_BORDER_DARKMODE
+
 
     def did_mount(self):
         self.page.run_task(self.on_mount)
@@ -107,38 +133,55 @@ class DropDown(ft.Container):
     """
 
     def __init__(
-        self,
-        height: float = 40,
-        width: float = 70,
-        menu_text_style: ft.TextStyle = ft.TextStyle(size=15, color='white,0.8'),
-        default_value: str = "None",
-        options=None,
-        on_select: callable = None,
-        max_visible: int = 3,
+            self,
+            height: float = BUTTON_HEIGHT,
+            width: float = 70,
+            text_style: ft.TextStyle = DEFAULT_TEXTSTYLE_DARKMODE,
+            default_value: str = "None",
+            options=None,
+            on_select: callable = None,
+            max_visible: int = 3,
     ):
         super().__init__()
         self.on_select = on_select
-        self.menu_text_style = menu_text_style
+        self.menu_text_style = text_style
         self.max_visible = max_visible
         self.options = options or []
         self.default_value = default_value
         self.height = height
         self.width = width
-        self.blur = 10
-        self.border_radius = DEFAULT_RADIUS
-        self.bgcolor = DEFAULT_BG
-        self.border = DEFAULT_BORDER
-        self.on_hover = self._on_hover
         self.text_display = ft.Text(value=self.default_value, style=self.menu_text_style)
+        self.showing_container = ft.Container(
+            self.text_display,
+            blur= DEFAULT_BLUR,
+            on_hover=self._on_hover,
+            alignment=ft.alignment.center,
+            border_radius=DEFAULT_RADIUS
+        )
         self.content = self._build_content()
 
     def _on_hover(self, e):
-        color = 'white,0.06'
+        color = 'white,0.03'
+        if self.page:
+            if self.page.theme_mode == ft.ThemeMode.LIGHT:
+                color = 'grey,0.1'
+            else:
+                color = 'white,0.03'
         e.control.bgcolor = color if e.control.bgcolor != color else DEFAULT_BG
         e.control.update()
 
     def get_value(self):
         return self.text_display.value
+
+    def before_update(self):
+        super().before_update()
+        if self.page:
+            if self.page.theme_mode == ft.ThemeMode.LIGHT:
+                self.showing_container.border = DEFAULT_BORDER_LIGHTMODE
+                self.text_display.style = DEFAULT_TEXTSTYLE_LIGHTMODE
+            else:
+                self.showing_container.border = DEFAULT_BORDER_DARKMODE
+                self.text_display.style = DEFAULT_TEXTSTYLE_DARKMODE
 
     def _on_select(self, value):
         if self.on_select:
@@ -156,51 +199,21 @@ class DropDown(ft.Container):
                 width=self.width,
                 on_select=self._on_select,
                 options=self.options,
-                max_visible=self.max_visible
+                max_visible=self.max_visible,
             )
         )
         self.page.update()
 
     def _build_content(self):
+        if self.page:
+            if self.page.theme_mode == ft.ThemeMode.LIGHT:
+                self.showing_container.border = DEFAULT_BORDER_LIGHTMODE
+                self.text_display.style = DEFAULT_TEXTSTYLE_LIGHTMODE
+            else:
+                self.showing_container.border = DEFAULT_BORDER_DARKMODE
+                self.text_display.style = DEFAULT_TEXTSTYLE_DARKMODE
         return ft.GestureDetector(
-            content=ft.Container(self.text_display, alignment=ft.alignment.center),
-            on_tap_up=self.on_tap_up
+            content=self.showing_container,
+            on_tap_up=self.on_tap_up,
+            mouse_cursor=ft.MouseCursor.CLICK
         )
-
-# EXAMPLE USAGE
-
-if __name__ == "__main__":
-    def main(page: ft.Page):
-        page.vertical_alignment = ft.MainAxisAlignment.CENTER
-        page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-        
-        
-        image = ft.Image(
-            opacity=0.8,
-            src="https://i2.wp.com/r1.ilikewallpaper.net/ipad-pro-wallpapers/download/101380/mixed-colours-abstract-4k-ipad-pro-wallpaper-ilikewallpaper_com.jpg",
-            )
-
-        drop_down = DropDown(
-                        default_value="Select an option",
-                        width=200,
-                        height=30,
-                        max_visible=6,
-                        on_select=lambda value: print(f"Selected: {value}"),
-                        options=[
-                            f"Option {i}" for i in range(1, 20)
-                        ]
-            )
-        
-        stack = ft.Stack([
-            ft.Container(image,alignment=ft.alignment.center),
-            ft.Container(
-                drop_down,
-                alignment=ft.alignment.center,
-            ),
-        ],expand=True)
-        page.add(
-            stack
-        )
-        page.update()
-
-    ft.app(main)
